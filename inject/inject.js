@@ -338,25 +338,35 @@ async function handleMessage (message) {
     })
     boardData = await boardData.json()
 
-    // Pick only what we need and put it in `cardsData`
-    cardsData = boardData.cards
-    cardsData = cardsData
-      .filter(card => (card.closed && includeArchived) || !card.closed)
-      .map(formatData)
+    const isObject = obj => Object.prototype.toString.call(obj) === '[object Object]';
+    // https://stackoverflow.com/a/61602592/192798
+    const flatten = (obj, roots = [], sep = '.') => Object.keys(obj).reduce((memo, prop) => Object.assign({}, memo, isObject(obj[prop]) ? flatten(obj[prop], roots.concat([prop])) : {[roots.concat([prop]).join(sep)]: obj[prop]}), {})
 
-    try {
-      cardsData = await JSON.stringify(cardsData)
+    const namesArray = {};
 
-      // `Papa.unparse` parses JSON data to CSV using the Papa Parse library
-      // It also takes are of sanitization
-      cardsData = Papa.unparse(cardsData, {
-        delimiter: delimiter
-      })
-    } catch (e) {
-      console.error('Could not parse JSON data: ', e)
+    function findArrays({tableName, ...colsValue}, obj) {
+        if (obj instanceof Array) {
+            namesArray[tableName] = namesArray[tableName] || [];
+            obj.forEach((objElement, o) => {
+                const colsValue2 = {...colsValue, [tableName]: o};
+                namesArray[tableName].push({...colsValue2, ...objElement});
+                return findArrays({tableName: `${tableName}[]`, ...colsValue2}, objElement);
+            });
+        } else if (obj instanceof Object) {
+            for (const objKey in obj) {
+                const element = obj[objKey];
+                findArrays({tableName: `${tableName}.${objKey}`, ...colsValue}, isObject(element) ? flatten(element) : element);
+            }
+        }
     }
 
-    return new Blob([cardsData], { type: 'application/csv' })
+    findArrays({tableName: 'board'}, boardData);
+
+    return Object.entries(namesArray)
+                 .map(([tableName, data]) => ({
+                   filename: `${tableName}.csv`,
+                   csvBlob:  new Blob([Papa.unparse(data, {delimiter})], {type: 'application/csv'})
+                 }))
   }
 }
 

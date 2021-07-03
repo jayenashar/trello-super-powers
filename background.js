@@ -111,29 +111,31 @@ async function handleMessage (message) {
 
     // TODO: Don't use a content script for this operation. Do everything in the
     // background script
-    csvBlob = await browser.tabs.sendMessage(tabId, {
+    const csvBlobs = await browser.tabs.sendMessage(tabId, {
       type: 'fetch',
       tabUrl,
       delimiter,
       includeArchived
     })
 
-    // Create a file URL so we can download it
-    downloadUrl = URL.createObjectURL(csvBlob)
+    for (const {filename, csvBlob} of csvBlobs) {
+      // Create a file URL so we can download it
+      downloadUrl = URL.createObjectURL(csvBlob)
 
-    try { // Try downloading the CSV file
-      browser.downloads.download({
-        url: downloadUrl,
-        filename: filename
-      })
-    } catch (e) {
-      console.error('TSP error: ', e)
+      try { // Try downloading the CSV file
+        browser.downloads.download({
+          url: downloadUrl,
+          filename: filename
+        })
+      } catch (e) {
+        console.error('TSP error: ', e)
 
-      browser.notifications.create({
-        type: 'basic',
-        title: 'Export failed',
-        message: `Trello Super Powers could export your board. We're sorry. Error message: ${e}`
-      })
+        browser.notifications.create({
+          type: 'basic',
+          title: 'Export failed',
+          message: `Trello Super Powers could export your board. We're sorry. Error message: ${e}`
+        })
+      }
     }
 
     browser.notifications.create({
