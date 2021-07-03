@@ -255,6 +255,7 @@ async function initializeFeatures () {
     return
   }
 
+  board = document.getElementById('content')
   // Trello board not yet ready
   if (!board) {
     console.info('[Trello Super Powers] Board not yet ready. Trying again in 2 seconds.')
